@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Health Chatbot</title>
+    <style>
+        /* Basic Reset */
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', sans-serif; }
+        
+        body {
+            background-color: #f0f2f5;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Header */
+        header {
+            background-color: #007bff;
+            color: white;
+            padding: 15px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+        header h2 { font-size: 1.2rem; }
+
+        .logout-btn {
+            background: rgba(255,255,255,0.2);
+            border: none;
+            color: white;
+            padding: 8px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.9rem;
+        }
+
+        .logout-btn:hover { background: rgba(255,255,255,0.3); }
+
+        /* Chat Container */
+        .chat-container {
+            flex: 1;
+            max-width: 800px;
+            width: 100%;
+            margin: 20px auto;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 0 15px rgba(0,0,0,0.1);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* Messages Area */
+        .chat-box {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            background-color: #f9f9f9;
+        }
+
+        .message {
+            margin-bottom: 15px;
+            padding: 10px 15px;
+            border-radius: 10px;
+            max-width: 80%;
+            line-height: 1.5;
+            word-wrap: break-word;
+        }
+
+        .user-message {
+            background-color: #007bff;
+            color: white;
+            align-self: flex-end;
+            margin-left: auto;
+            border-bottom-right-radius: 0;
+        }
+
+        .bot-message {
+            background-color: #e9ecef;
+            color: #333;
+            align-self: flex-start;
+            margin-right: auto;
+            border-bottom-left-radius: 0;
+        }
+
+        /* Input Area */
+        .input-area {
+            padding: 20px;
+            border-top: 1px solid #ddd;
+            display: flex;
+            gap: 10px;
+            background: white;
+        }
+
+        input[type="text"] {
+            flex: 1;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 25px;
+            outline: none;
+            font-size: 1rem;
+        }
+
+        button.send-btn {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 25px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background 0.3s;
+        }
+
+        button.send-btn:hover { background-color: #0056b3; }
+        button.send-btn:disabled { background-color: #ccc; cursor: not-allowed; }
+
+        /* Loading Indicator */
+        .typing-indicator {
+            font-style: italic;
+            color: #888;
+            font-size: 0.9rem;
+            margin-bottom: 10px;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h2>🩺 AI Health Assistant</h2>
+        <button class="logout-btn" onclick="logout()">Logout</button>
+    </header>
+
+    <div class="chat-container">
+        <div class="chat-box" id="chatBox">
+            <!-- Messages will appear here -->
+            <div class="message bot-message">
+                Hello! I am your AI Health Assistant. Please describe your symptoms (e.g., "fever", "headache") so I can help you.
+            </div>
+        </div>
+        <div class="typing-indicator" id="typingIndicator">AI is typing...</div>
+        
+        <div class="input-area">
+            <input type="text" id="symptomInput" placeholder="Type your symptoms here..." autocomplete="off">
+            <button class="send-btn" id="sendBtn">Send</button>
+        </div>
+    </div>
+
+    <script>
+        // ---------------- CHAT LOGIC ----------------
+        const chatBox = document.getElementById("chatBox");
+        const symptomInput = document.getElementById("symptomInput");
+        const sendBtn = document.getElementById("sendBtn");
+        const typingIndicator = document.getElementById("typingIndicator");
+
+        // Check if user is logged in
+        const token = localStorage.getItem("token");
+        if (!token) {
+            alert("Please login first!");
+            window.location.href = "login.html";
+        }
+
+        // Function to add message to UI
+        function addMessage(text, sender) {
+            const div = document.createElement("div");
+            div.classList.add("message");
+            div.classList.add(sender === "user" ? "user-message" : "bot-message");
+            div.innerHTML = text; // innerHTML allows HTML formatting from backend
+            chatBox.appendChild(div);
+            chatBox.scrollTop = chatBox.scrollHeight; // Auto scroll to bottom
+        }
+
+        // Function to handle sending message
+        async function sendMessage() {
+            const symptom = symptomInput.value.trim();
+            if (!symptom) return;
+
+            // 1. Add user message to UI
+            addMessage(symptom, "user");
+            symptomInput.value = "";
+            sendBtn.disabled = true;
+            typingIndicator.style.display = "block";
+
+            try {
+                // 2. Send to Backend
+                const response = await fetch("http://localhost:5000/chat", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "Authorization": `Bearer ${token}` // Send token for security
+                    },
+                    body: JSON.stringify({ symptom })
+                });
+
+                const data = await response.json();
+
+                // 3. Add Bot response to UI
+                addMessage(data.reply, "bot");
+
+            } catch (error) {
+                console.error("Error:", error);
+                addMessage("Sorry, I encountered an error. Please try again.", "bot");
+            } finally {
+                sendBtn.disabled = false;
+                typingIndicator.style.display = "none";
+            }
+        }
+
+        // Event Listeners
+        sendBtn.addEventListener("click", sendMessage);
+        symptomInput.addEventListener("keypress", function (e) {
+            if (e.key === "Enter") sendMessage();
+        });
+
+        // Logout Function
+        function logout() {
+            localStorage.removeItem("token");
+            window.location.href = "login.html";
+        }
+    </script>
+</body>
+</html>
